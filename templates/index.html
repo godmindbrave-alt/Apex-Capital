@@ -43,7 +43,7 @@
         {% for asset, price in prices.items() %}
         <div class="ticker-card">
             <h4>{{ asset }}/USD</h4>
-            <div class="price">${{ "%.2f"|format(price) }}</div>
+            <div class="price">${{ "%.2f"|format(price.price) }}</div>
         </div>
         {% endfor %}
     </div>
