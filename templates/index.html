@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Apex Capital | Global Financial Terminal</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background: #07090e; color: #eaecef; overflow-x: hidden; }
+        header { display: flex; justify-content: space-between; align-items: center; padding: 20px 50px; border-bottom: 1px solid #1f293d; background: #0b0f17; }
+        .logo { font-size: 22px; font-weight: bold; color: #fff; letter-spacing: 1px; }
+        .logo span { color: #00C853; }
+        .nav-btns a { margin-left: 15px; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 14px; transition: 0.2s; }
+        .btn-login { color: #eaecef; border: 1px solid #2d3b55; }
+        .btn-login:hover { border-color: #00C853; color: #00C853; }
+        .btn-register { background: #00C853; color: #000; }
+        .btn-register:hover { background: #00e676; box-shadow: 0 0 10px rgba(0,200,83,0.4); }
+        .hero { text-align: center; padding: 100px 20px; max-width: 800px; margin: 0 auto; }
+        .hero h1 { font-size: 48px; color: #fff; margin-bottom: 20px; }
+        .hero h1 span { color: #00C853; }
+        .hero p { color: #8a99ad; font-size: 18px; margin-bottom: 40px; line-height: 1.6; }
+        .ticker-section { display: flex; justify-content: center; gap: 20px; padding: 30px; flex-wrap: wrap; }
+        .ticker-card { background: #121824; border: 1px solid #1f293d; padding: 20px; border-radius: 8px; width: 180px; text-align: left; }
+        .ticker-card h4 { color: #8a99ad; font-size: 14px; margin-bottom: 5px; }
+        .ticker-card .price { font-size: 18px; font-weight: bold; color: #00C853; }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo">⚡ APEX <span>CAPITAL</span></div>
+        <div class="nav-btns">
+            <a href="/login" class="btn-login">Log In</a>
+            <a href="/register" class="btn-register">Get Started</a>
+        </div>
+    </header>
+
+    <div class="hero">
+        <h1>Trade Stocks & Crypto with <span>Real Confidence</span></h1>
+        <p>Apex Capital brings professional-grade execution, secure real-money deposits, and instant withdrawals right to your terminal.</p>
+        <a href="/register" class="btn-register" style="padding: 15px 30px; font-size: 16px; display: inline-block;">Open Real Account</a>
+    </div>
+
+    <div class="ticker-section">
+        {% for asset, price in prices.items() %}
+        <div class="ticker-card">
+            <h4>{{ asset }}/USD</h4>
+            <div class="price">${{ "%.2f"|format(price) }}</div>
+        </div>
+        {% endfor %}
+    </div>
+</body>
+</html>

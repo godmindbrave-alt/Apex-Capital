@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Apex Global Pro Terminal - Live Financial Market</title>
+    <style>
+        :root {
+            --bg-base: #07090c;
+            --bg-panel: #12161c;
+            --border-line: #222831;
+            --text-color: #f1f3f5;
+            --text-muted: #8b949e;
+            --accent-gold: #f39c12;
+            --accent-green: #2ecc71;
+            --accent-red: #e74c3c;
+            --accent-blue: #3498db;
+        }
+        body { font-family: 'Segoe UI', Roboto, Helvetica, sans-serif; background-color: var(--bg-base); color: var(--text-color); margin: 0; padding: 15px; }
+        .wrapper { max-width: 1550px; margin: 0 auto; }
+
+        header { display: flex; justify-content: space-between; align-items: center; background: var(--bg-panel); padding: 15px 25px; border-radius: 8px; border: 1px solid var(--border-line); margin-bottom: 20px; }
+        .brand { font-size: 1.5em; font-weight: bold; color: var(--accent-gold); letter-spacing: 1px; }
+        .user-controls { display: flex; align-items: center; gap: 20px; font-size: 0.9em; }
+        .btn-logout { background: var(--accent-red); color: white; padding: 6px 14px; border-radius: 4px; text-decoration: none; font-weight: bold; }
+
+        .flash-alert { background: rgba(243, 156, 18, 0.15); color: var(--accent-gold); padding: 10px 15px; border-radius: 4px; border-left: 4px solid var(--accent-gold); margin-bottom: 20px; font-size: 0.9em; }
+
+        .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .metric-card { background: var(--bg-panel); padding: 20px; border-radius: 8px; border: 1px solid var(--border-line); }
+        .metric-card h5 { margin: 0 0 8px 0; color: var(--text-muted); text-transform: uppercase; font-size: 0.75em; letter-spacing: 0.5px; }
+        .metric-card .val { font-size: 1.7em; font-weight: bold; color: var(--accent-green); }
+
+        .workspace { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; margin-bottom: 20px; }
+        @media(max-width: 1100px) { .workspace { grid-template-columns: 1fr; } }
+
+        .panel { background: var(--bg-panel); padding: 20px; border-radius: 8px; border: 1px solid var(--border-line); margin-bottom: 20px; }
+        .panel h3 { margin-top: 0; color: var(--accent-gold); font-size: 1.05em; border-bottom: 1px solid var(--border-line); padding-bottom: 10px; margin-bottom: 15px; }
+
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 10px; text-align: left; border-bottom: 1px solid var(--border-line); font-size: 0.88em; }
+        th { color: var(--text-muted); text-transform: uppercase; font-size: 0.75em; }
+
+        label { display: block; margin-top: 10px; margin-bottom: 4px; color: var(--text-muted); font-size: 0.8em; }
+        input, select { width: 100%; padding: 10px; background: #1a202c; border: 1px solid #2d3748; color: white; border-radius: 4px; box-sizing: border-box; font-size: 0.9em; }
+        .btn-action { width: 100%; padding: 12px; background: var(--accent-gold); color: #000; font-weight: bold; border: none; border-radius: 4px; cursor: pointer; margin-top: 15px; }
+        .btn-action:hover { opacity: 0.9; }
+
+        .tick-up { color: var(--accent-green) !important; font-weight: bold; }
+        .tick-down { color: var(--accent-red) !important; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="wrapper">
+        <header>
+            <div class="brand">APEX GLOBAL <span style="font-size: 0.5em; color: var(--text-muted);">PRO TRADING & BANKING TERMINAL</span></div>
+            <div class="user-controls">
+                <span>User: <strong>{{ user.username }}</strong></span>
+                <a href="{{ url_for('logout') }}" class="btn-logout">Logout</a>
+            </div>
+        </header>
+
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="flash-alert">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <!-- Metrics Overview Banner -->
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <h5>Total Portfolio Net Worth</h5>
+                <div class="val" style="color: var(--accent-gold);">${{ "%.2f"|format(net_worth) }}</div>
+            </div>
+            <div class="metric-card">
+                <h5>USD Cash Wallet</h5>
+                <div class="val">${{ "%.2f"|format(user.balance_usd) }}</div>
+            </div>
+            <div class="metric-card">
+                <h5>NGN Naira Wallet</h5>
+                <div class="val" style="color: var(--accent-blue);">₦{{ "{:,.2f}".format(user.balance_ngn) }}</div>
+            </div>
+            <div class="metric-card">
+                <h5>Forex Benchmark</h5>
+                <div class="val" style="font-size: 1.3em; color: #fff;">$1 USD = ₦{{ exchange_rate }}</div>
+            </div>
+        </div>
+
+        <!-- Main Workspace Grid -->
+        <div class="workspace">
+            <div>
+                <!-- Live Market Ticker with Real-time Simulated Tick Fluctuations -->
+                <div class="panel">
+                    <h3>Live Global Forex, Crypto & Equity Feed</h3>
+                    <table>
+                        <tr><th>Ticker</th><th>Asset Name</th><th>Category</th><th>Live Market Price</th><th>Status</th></tr>
+                        {% for symbol, info in market.items() %}
+                            <tr>
+                                <td><strong>{{ symbol }}</strong></td>
+                                <td style="color: var(--text-muted);">{{ info.name }}</td>
+                                <td><span style="background: #1a202c; padding: 2px 6px; border-radius: 3px; font-size: 0.75em;">{{ info.category }}</span></td>
+                                <td id="price-{{ symbol }}" style="font-weight: bold; color: var(--accent-green);">${{ "%.2f"|format(info.price) }}</td>
+                                <td style="color: var(--accent-green);">● Active Stream</td>
+                            </tr>
+                        {% endfor %}
+                    </table>
+                </div>
+
+                <!-- Active Portfolio Holdings -->
+                <div class="panel">
+                    <h3>Active Positions & Portfolio Holdings</h3>
+                    <table>
+                        <tr><th>Asset</th><th>Units</th><th>Avg Entry Price</th><th>Market Price</th><th>Market Value</th><th>Unrealized P/L</th></tr>
+                        {% if portfolio %}
+                            {% for item in portfolio %}
+                                <tr>
+                                    <td><strong>{{ item.symbol }}</strong></td>
+                                    <td>{{ item.shares }}</td>
+                                    <td>${{ "%.2f"|format(item.avg_price) }}</td>
+                                    <td>${{ "%.2f"|format(item.current_price) }}</td>
+                                    <td>${{ "%.2f"|format(item.market_value) }}</td>
+                                    <td style="color: {% if item.pl >= 0 %}var(--accent-green){% else %}var(--accent-red){% endif %}; font-weight: bold;">
+                                        ${{ "%.2f"|format(item.pl) }}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr><td colspan="6" style="color: var(--text-muted); text-align: center; padding: 15px;">No active holdings. Execute a trade order on the right.</td></tr>
+                        {% endif %}
+                    </table>
+                </div>
+
+                <!-- Linked Bank Accounts -->
+                <div class="panel">
+                    <h3>Linked Commercial Bank Accounts</h3>
+                    <table>
+                        <tr><th>Bank Name</th><th>Account Holder Name</th><th>Account Number</th></tr>
+                        {% if bank_accounts %}
+                            {% for acc in bank_accounts %}
+                                <tr>
+                                    <td><strong>{{ acc.bank_name }}</strong></td>
+                                    <td>{{ acc.account_name }}</td>
+                                    <td>****{{ acc.account_number[-4:] }}</td>
+                                </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr><td colspan="3" style="color: var(--text-muted); text-align: center; padding: 15px;">No bank accounts linked yet. Use the panel on the right to add one.</td></tr>
+                        {% endif %}
+                    </table>
+                </div>
+            </div>
+
+            <!-- Right Sidebar: Trading, Banking & Conversion Terminals -->
+            <div>
+                <!-- Order Execution Terminal -->
+                <div class="panel">
+                    <h3>Order Execution Terminal</h3>
+                    <form method="POST" action="{{ url_for('trade') }}">
+                        <label>Asset Symbol</label>
+                        <select name="symbol">
+                            {% for symbol, info in market.items() %}
+                                <option value="{{ symbol }}">{{ symbol }} - ${{ "%.2f"|format(info.price) }}</option>
+                            {% endfor %}
+                        </select>
+                        <label>Units / Shares</label>
+                        <input type="number" step="any" name="shares" min="0.01" value="1" required>
+                        <label>Order Action</label>
+                        <select name="action">
+                            <option value="BUY">BUY / LONG</option>
+                            <option value="SELL">SELL / CLOSE</option>
+                        </select>
+                        <button type="submit" class="btn-action">Execute Live Order</button>
+                    </form>
+                </div>
+
+                <!-- Currency Exchange Desk -->
+                <div class="panel">
+                    <h3>Currency Exchange Converter</h3>
+                    <form method="POST" action="{{ url_for('convert') }}">
+                        <label>Conversion Route</label>
+                        <select name="direction">
+                            <option value="USD_TO_NGN">USD ($) to NGN (₦)</option>
+                            <option value="NGN_TO_USD">NGN (₦) to USD ($)</option>
+                        </select>
+                        <label>Amount</label>
+                        <input type="number" step="any" name="amount" min="1" value="100" required>
+                        <button type="submit" class="btn-action" style="background: var(--accent-blue); color: white;">Convert Currency Rate</button>
+                    </form>
+                </div>
+
+                <!-- Link Bank Account Form -->
+                <div class="panel">
+                    <h3>Link Bank Account</h3>
+                    <form method="POST" action="{{ url_for('link_bank') }}">
+                        <label>Select Commercial Bank</label>
+                        <select name="bank_name">
+                            <option value="Access Bank">Access Bank</option>
+                            <option value="Guaranty Trust Bank (GTB)">Guaranty Trust Bank (GTB)</option>
+                            <option value="Zenith Bank">Zenith Bank</option>
+                            <option value="United Bank for Africa (UBA)">United Bank for Africa (UBA)</option>
+                            <option value="First Bank of Nigeria">First Bank of Nigeria</option>
+                            <option value="Opay Digital Services">Opay Digital Services</option>
+                            <option value="Moniepoint MFB">Moniepoint MFB</option>
+                        </select>
+                        <label>Account Number (10 Digits)</label>
+                        <input type="text" name="account_number" placeholder="0123456789" required>
+                        <label>Account Holder Full Name</label>
+                        <input type="text" name="account_name" placeholder="John Doe" required>
+                        <button type="submit" class="btn-action" style="background: #8e44ad; color: white;">Link Bank Account</button>
+                    </form>
+                </div>
+
+                <!-- Bank Deposit & Withdrawal Gateways -->
+                <div class="panel">
+                    <h3>Deposit & Withdrawal Gateway</h3>
+                    <form method="POST" action="{{ url_for('deposit') }}">
+                        <label>Funding Bank Source</label>
+                        <select name="bank_name">
+                            <option value="Access Bank">Access Bank</option>
+                            <option value="GTBank">GTBank</option>
+                            <option value="Zenith Bank">Zenith Bank</option>
+                            <option value="Opay">Opay</option>
+                        </select>
+                        <label>Wallet Currency</label>
+                        <select name="currency">
+                            <option value="USD">USD ($)</option>
+                            <option value="NGN">NGN (₦)</option>
+                        </select>
+                        <label>Deposit Amount</label>
+                        <input type="number" step="any" name="amount" min="1000" value="50000" required>
+                        <button type="submit" class="btn-action" style="background: var(--accent-green); color: #000;">Process Bank Deposit</button>
+                    </form>
+
+                    <form method="POST" action="{{ url_for('withdraw') }}" style="margin-top: 15px;">
+                        <label>Withdrawal Currency</label>
+                        <select name="currency">
+                            <option value="USD">USD ($)</option>
+                            <option value="NGN">NGN (₦)</option>
+                        </select>
+                        <label>Destination Bank</label>
+                        <select name="bank_target">
+                            {% if bank_accounts %}
+                                {% for acc in bank_accounts %}
+                                    <option value="{{ acc.bank_name }} - {{ acc.account_number }}">{{ acc.bank_name }} (****{{ acc.account_number[-4:] }})</option>
+                                {% endfor %}
+                            {% else %}
+                                <option value="Default Linked Bank">Link a bank account first</option>
+                            {% endif %}
+                        </select>
+                        <label>Withdrawal Amount</label>
+                        <input type="number" step="any" name="amount" min="100" value="10000" required>
+                        <button type="submit" class="btn-action" style="background: var(--accent-red); color: white;">Request Bank Payout</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Complete Transaction Audit Ledger -->
+        <div class="panel">
+            <h3>Complete Financial Ledger & Transaction History</h3>
+            <table>
+                <tr><th>Timestamp</th><th>Transaction Type</th><th>Details</th><th>Amount</th><th>Status</th></tr>
+                {% if ledger %}
+                    {% for tx in ledger %}
+                        <tr>
+                            <td style="color: var(--text-muted);">{{ tx.date }}</td>
+                            <td><span style="padding: 3px 8px; border-radius: 4px; font-weight: bold; background: #1a202c; color: var(--accent-gold);">{{ tx.tx_type }}</span></td>
+                            <td>{{ tx.details }}</td>
+                            <td style="font-weight: bold;">{{ tx.amount }}</td>
+                            <td style="color: var(--accent-green);">{{ tx.status }}</td>
+                        </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr><td colspan="5" style="color: var(--text-muted); text-align: center; padding: 20px;">No transaction records logged.</td></tr>
+                {% endif %}
+            </table>
+        </div>
+    </div>
+
+    <!-- Live Ticker Animation Engine (Simulating real-time market fluctuations) -->
+    <script>
+        setInterval(() => {
+            const symbols = ['EURUSD', 'GBPUSD', 'USDNGN', 'BTC', 'ETH', 'TSLA', 'AAPL', 'NVDA'];
+            const randomSymbol = symbols[Math.floor(Math.random() * symbols.length)];
+            const elem = document.getElementById('price-' + randomSymbol);
+            if (elem) {
+                let currentText = elem.innerText.replace('$', '').replace(',', '');
+                let val = parseFloat(currentText);
+                let change = (Math.random() * 0.4 - 0.2);
+                val = Math.max(0.01, val + change);
+                elem.innerText = '$' + val.toFixed(2);
+                elem.className = change >= 0 ? 'tick-up' : 'tick-down';
+            }
+        }, 1500);
+    </script>
+</body>
+</html>
