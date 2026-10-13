@@ -70,7 +70,7 @@ MARKET_CATALOG = {
 def index():
     if 'username' in session:
         return redirect(url_for('dashboard'))
-    return render_template('index.html')
+return render_template('index.html', prices=MARKET_CATALOG)
 
 
 @app.route('/register', methods=['GET', 'POST'])
