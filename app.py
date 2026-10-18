@@ -6,8 +6,7 @@ import datetime
 app = Flask(__name__)
 app.secret_key = 'apex_global_fintech_secure_key_2026'
 
-
-# Database Initialization
+# Database Initialization with Context Safety
 def init_db():
     conn = sqlite3.connect('platform.db')
     cursor = conn.cursor()
@@ -34,13 +33,14 @@ def init_db():
     conn.commit()
     conn.close()
 
-
 init_db()
 
 
 # Core Routes
 @app.route('/')
 def home():
+    if 'user_id' in session:
+        return redirect(url_for('dashboard'))
     return render_template('index.html')
 
 
@@ -48,22 +48,35 @@ def home():
 def dashboard():
     if 'user_id' not in session:
         return redirect(url_for('home'))
+    
     conn = sqlite3.connect('platform.db')
     conn.row_factory = sqlite3.Row
     user = conn.execute('SELECT * FROM users WHERE id = ?', (session['user_id'],)).fetchone()
-    transactions = conn.execute('SELECT * FROM transactions WHERE user_id = ? ORDER BY timestamp DESC',
-                                (session['user_id'],)).fetchall()
+    transactions = conn.execute(
+        'SELECT * FROM transactions WHERE user_id = ? ORDER BY timestamp DESC',
+        (session['user_id'],)
+    ).fetchall()
     conn.close()
+    
+    if not user:
+        session.clear()
+        return redirect(url_for('home'))
+        
     return render_template('dashboard.html', user=user, transactions=transactions)
 
 
 # Auth Routes
 @app.route('/register', methods=['POST'])
 def register():
-    data = request.json
+    data = request.get_json(silent=True) or request.form
     username = data.get('username')
     email = data.get('email')
-    password = generate_password_hash(data.get('password'))
+    raw_password = data.get('password')
+
+    if not username or not email or not raw_password:
+        return jsonify({'status': 'error', 'message': 'All fields are required'}), 400
+
+    password = generate_password_hash(raw_password)
 
     try:
         conn = sqlite3.connect('platform.db')
@@ -72,6 +85,7 @@ def register():
         conn.commit()
         user_id = cursor.lastrowid
         conn.close()
+        
         session['user_id'] = user_id
         return jsonify({'status': 'success', 'message': 'Registration successful'})
     except sqlite3.IntegrityError:
@@ -80,9 +94,12 @@ def register():
 
 @app.route('/login', methods=['POST'])
 def login():
-    data = request.json
+    data = request.get_json(silent=True) or request.form
     email = data.get('email')
     password = data.get('password')
+
+    if not email or not password:
+        return jsonify({'status': 'error', 'message': 'Email and password are required'}), 400
 
     conn = sqlite3.connect('platform.db')
     conn.row_factory = sqlite3.Row
@@ -92,6 +109,7 @@ def login():
     if user and check_password_hash(user['password'], password):
         session['user_id'] = user['id']
         return jsonify({'status': 'success', 'message': 'Login successful'})
+        
     return jsonify({'status': 'error', 'message': 'Invalid credentials'}), 401
 
 
@@ -106,42 +124,62 @@ def logout():
 def deposit():
     if 'user_id' not in session:
         return jsonify({'status': 'error', 'message': 'Unauthorized'}), 401
-    amount = float(request.json.get('amount', 0))
+        
+    data = request.get_json(silent=True) or request.form
+    try:
+        amount = float(data.get('amount', 0))
+    except (ValueError, TypeError):
+        return jsonify({'status': 'error', 'message': 'Invalid amount format'}), 400
+
     if amount <= 0:
-        return jsonify({'status': 'error', 'message': 'Invalid amount'}), 400
+        return jsonify({'status': 'error', 'message': 'Deposit amount must be greater than zero'}), 400
 
     conn = sqlite3.connect('platform.db')
     cursor = conn.cursor()
     cursor.execute('UPDATE users SET balance = balance + ? WHERE id = ?', (amount, session['user_id']))
-    cursor.execute('INSERT INTO transactions (user_id, type, amount) VALUES (?, ?, ?)',
-                   (session['user_id'], 'Deposit', amount))
+    cursor.execute(
+        'INSERT INTO transactions (user_id, type, amount, status) VALUES (?, ?, ?, ?)',
+        (session['user_id'], 'Deposit', amount, 'Completed')
+    )
     conn.commit()
     conn.close()
-    return jsonify({'status': 'success', 'message': f'Deposited ${amount:.2f}'})
+    
+    return jsonify({'status': 'success', 'message': f'Successfully deposited ${amount:,.2f}'})
 
 
 @app.route('/withdraw', methods=['POST'])
 def withdraw():
     if 'user_id' not in session:
         return jsonify({'status': 'error', 'message': 'Unauthorized'}), 401
-    amount = float(request.json.get('amount', 0))
+        
+    data = request.get_json(silent=True) or request.form
+    try:
+        amount = float(data.get('amount', 0))
+    except (ValueError, TypeError):
+        return jsonify({'status': 'error', 'message': 'Invalid amount format'}), 400
+
+    if amount <= 0:
+        return jsonify({'status': 'error', 'message': 'Withdrawal amount must be greater than zero'}), 400
 
     conn = sqlite3.connect('platform.db')
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     user = cursor.execute('SELECT balance FROM users WHERE id = ?', (session['user_id'],)).fetchone()
 
-    if amount <= 0 or user['balance'] < amount:
+    if not user or user['balance'] < amount:
         conn.close()
-        return jsonify({'status': 'error', 'message': 'Insufficient funds or invalid amount'}), 400
+        return jsonify({'status': 'error', 'message': 'Insufficient funds in account'}), 400
 
     cursor.execute('UPDATE users SET balance = balance - ? WHERE id = ?', (amount, session['user_id']))
-    cursor.execute('INSERT INTO transactions (user_id, type, amount) VALUES (?, ?, ?)',
-                   (session['user_id'], 'Withdrawal', amount))
+    cursor.execute(
+        'INSERT INTO transactions (user_id, type, amount, status) VALUES (?, ?, ?, ?)',
+        (session['user_id'], 'Withdrawal', amount, 'Completed')
+    )
     conn.commit()
     conn.close()
-    return jsonify({'status': 'success', 'message': f'Withdrew ${amount:.2f}'})
+    
+    return jsonify({'status': 'success', 'message': f'Successfully withdrew ${amount:,.2f}'})
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, port=5000)
