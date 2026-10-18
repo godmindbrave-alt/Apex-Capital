@@ -1,6 +1,9 @@
 from flask import Flask, render_template, redirect, url_for, request, session, flash
 from flask_sqlalchemy import SQLAlchemy
+from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
+import random
+import string
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'apex_enterprise_terminal_secure_9988'
@@ -9,16 +12,14 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
-
 # ----------------- ADVANCED DATABASE MODELS ----------------- #
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(150), unique=True, nullable=False)
-    password = db.Column(db.String(150), nullable=False)
+    password = db.Column(db.String(255), nullable=False)
     balance_usd = db.Column(db.Float, default=0.0)
     balance_ngn = db.Column(db.Float, default=0.0)
-
 
 class Portfolio(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -27,7 +28,6 @@ class Portfolio(db.Model):
     shares = db.Column(db.Float, nullable=False)
     avg_price = db.Column(db.Float, nullable=False, default=0.0)
 
-
 class BankAccount(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(150), nullable=False)
@@ -35,9 +35,9 @@ class BankAccount(db.Model):
     account_number = db.Column(db.String(20), nullable=False)
     account_name = db.Column(db.String(150), nullable=False)
 
-
 class TransactionLedger(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    tx_ref = db.Column(db.String(50), unique=True, nullable=False)
     username = db.Column(db.String(150), nullable=False)
     tx_type = db.Column(db.String(50), nullable=False)  # DEPOSIT, WITHDRAW, BUY, SELL, CONVERT
     details = db.Column(db.String(255), nullable=False)
@@ -45,12 +45,17 @@ class TransactionLedger(db.Model):
     status = db.Column(db.String(30), nullable=False, default='SUCCESS')
     date = db.Column(db.String(50), nullable=False)
 
-
 with app.app_context():
     db.create_all()
 
+# Helper function to generate transaction reference
+def generate_tx_ref():
+    letters = ''.join(random.choices(string.ascii_uppercase, k=3))
+    digits = ''.join(random.choices(string.digits, k=8))
+    return f"APEX-{letters}-{digits}"
+
 # Forex & Asset Market Data Catalog
-EXCHANGE_RATE_USD_NGN = 1550.0  # Live benchmark rate $1 = ₦1,550
+EXCHANGE_RATE_USD_NGN = 1550.0  # Benchmark rate $1 = ₦1,550
 
 MARKET_CATALOG = {
     'EURUSD': {'name': 'Euro / US Dollar', 'price': 1.0850, 'category': 'Forex', 'type': 'currency'},
@@ -79,17 +84,19 @@ def register():
         username = request.form.get('username')
         password = request.form.get('password')
         if not username or not password:
-            flash('All input fields are required.')
+            flash('All input fields are required.', 'danger')
             return redirect(url_for('register'))
 
         if User.query.filter_by(username=username).first():
-            flash('Username is already taken.')
+            flash('Username is already taken.', 'danger')
             return redirect(url_for('register'))
 
-        new_user = User(username=username, password=password, balance_usd=0.0, balance_ngn=0.0)
+        hashed_password = generate_password_hash(password)
+        new_user = User(username=username, password=hashed_password, balance_usd=0.0, balance_ngn=0.0)
         db.session.add(new_user)
         db.session.commit()
         session['username'] = username
+        flash('Account created successfully! Welcome to Apex Terminal.', 'success')
         return redirect(url_for('dashboard'))
     return render_template('register.html')
 
@@ -99,11 +106,14 @@ def login():
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
-        user = User.query.filter_by(username=username, password=password).first()
-        if user:
+        user = User.query.filter_by(username=username).first()
+        
+        if user and check_password_hash(user.password, password):
             session['username'] = username
+            flash('Logged in successfully.', 'success')
             return redirect(url_for('dashboard'))
-        flash('Invalid username or password.')
+            
+        flash('Invalid username or password.', 'danger')
         return redirect(url_for('login'))
     return render_template('login.html')
 
@@ -160,14 +170,13 @@ def link_bank():
     account_name = request.form.get('account_name')
 
     if not bank_name or not account_number or not account_name:
-        flash('All banking details are required to link account.')
+        flash('All banking details are required to link account.', 'danger')
         return redirect(url_for('dashboard'))
 
-    new_bank = BankAccount(username=user.username, bank_name=bank_name, account_number=account_number,
-                           account_name=account_name)
+    new_bank = BankAccount(username=user.username, bank_name=bank_name, account_number=account_number, account_name=account_name)
     db.session.add(new_bank)
     db.session.commit()
-    flash(f'Successfully linked {bank_name} account ending in {account_number[-4:]}!')
+    flash(f'Successfully linked {bank_name} account ending in {account_number[-4:]}!', 'success')
     return redirect(url_for('dashboard'))
 
 
@@ -180,10 +189,10 @@ def deposit():
     try:
         amount = float(request.form.get('amount', 0))
         currency = request.form.get('currency', 'USD')
-        bank = request.form.get('bank_name')
+        bank = request.form.get('bank_name', 'Direct Bank Transfer')
 
         if amount <= 0:
-            flash('Deposit amount must be greater than zero.')
+            flash('Deposit amount must be greater than zero.', 'danger')
             return redirect(url_for('dashboard'))
 
         if currency == 'NGN':
@@ -192,6 +201,7 @@ def deposit():
             user.balance_usd += amount
 
         tx = TransactionLedger(
+            tx_ref=generate_tx_ref(),
             username=user.username,
             tx_type='DEPOSIT',
             details=f'Bank Deposit via {bank}',
@@ -201,9 +211,9 @@ def deposit():
         )
         db.session.add(tx)
         db.session.commit()
-        flash(f'Successfully funded wallet with {amount:,.2f} {currency}!')
+        flash(f'Successfully funded wallet with {amount:,.2f} {currency}!', 'success')
     except ValueError:
-        flash('Invalid numeric amount entered.')
+        flash('Invalid numeric amount entered.', 'danger')
     return redirect(url_for('dashboard'))
 
 
@@ -216,20 +226,21 @@ def withdraw():
     try:
         amount = float(request.form.get('amount', 0))
         currency = request.form.get('currency', 'USD')
-        bank_target = request.form.get('bank_target')
+        bank_target = request.form.get('bank_target', 'Linked Bank Account')
 
         if currency == 'NGN':
             if user.balance_ngn < amount:
-                flash('Insufficient NGN balance for withdrawal.')
+                flash('Insufficient NGN balance for withdrawal.', 'danger')
                 return redirect(url_for('dashboard'))
             user.balance_ngn -= amount
         else:
             if user.balance_usd < amount:
-                flash('Insufficient USD balance for withdrawal.')
+                flash('Insufficient USD balance for withdrawal.', 'danger')
                 return redirect(url_for('dashboard'))
             user.balance_usd -= amount
 
         tx = TransactionLedger(
+            tx_ref=generate_tx_ref(),
             username=user.username,
             tx_type='WITHDRAW',
             details=f'Payout Transfer to {bank_target}',
@@ -239,9 +250,9 @@ def withdraw():
         )
         db.session.add(tx)
         db.session.commit()
-        flash(f'Withdrawal of {amount:,.2f} {currency} sent to {bank_target}.')
+        flash(f'Withdrawal request of {amount:,.2f} {currency} sent to {bank_target}.', 'success')
     except ValueError:
-        flash('Invalid withdrawal request.')
+        flash('Invalid withdrawal request.', 'danger')
     return redirect(url_for('dashboard'))
 
 
@@ -256,29 +267,39 @@ def convert():
         amount = float(request.form.get('amount', 0))
 
         if amount <= 0:
-            flash('Invalid conversion amount.')
+            flash('Invalid conversion amount.', 'danger')
             return redirect(url_for('dashboard'))
 
         if direction == 'USD_TO_NGN':
             if user.balance_usd < amount:
-                flash('Insufficient USD balance.')
+                flash('Insufficient USD balance.', 'danger')
                 return redirect(url_for('dashboard'))
             converted = amount * EXCHANGE_RATE_USD_NGN
             user.balance_usd -= amount
             user.balance_ngn += converted
-            flash(f'Converted ${amount:.2f} USD to ₦{converted:,.2f} NGN')
+            flash(f'Successfully converted ${amount:,.2f} USD to ₦{converted:,.2f} NGN', 'success')
         elif direction == 'NGN_TO_USD':
             if user.balance_ngn < amount:
-                flash('Insufficient NGN balance.')
+                flash('Insufficient NGN balance.', 'danger')
                 return redirect(url_for('dashboard'))
             converted = amount / EXCHANGE_RATE_USD_NGN
             user.balance_ngn -= amount
             user.balance_usd += converted
-            flash(f'Converted ₦{amount:,.2f} NGN to ${converted:.2f} USD')
+            flash(f'Successfully converted ₦{amount:,.2f} NGN to ${converted:,.2f} USD', 'success')
 
+        tx = TransactionLedger(
+            tx_ref=generate_tx_ref(),
+            username=user.username,
+            tx_type='CONVERT',
+            details=f'Currency Exchange ({direction})',
+            amount=amount,
+            status='SUCCESS',
+            date=datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        )
+        db.session.add(tx)
         db.session.commit()
     except ValueError:
-        flash('Currency exchange error.')
+        flash('Currency exchange error.', 'danger')
     return redirect(url_for('dashboard'))
 
 
@@ -288,16 +309,16 @@ def trade():
         return redirect(url_for('login'))
     user = User.query.filter_by(username=session['username']).first()
 
-    symbol = request.form.get('symbol').upper()
+    symbol = request.form.get('symbol', '').upper()
     try:
         shares = float(request.form.get('shares', 0))
     except ValueError:
-        flash('Invalid quantity.')
+        flash('Invalid quantity entered.', 'danger')
         return redirect(url_for('dashboard'))
 
     action = request.form.get('action')
     if symbol not in MARKET_CATALOG or shares <= 0:
-        flash('Selected asset or quantity is invalid.')
+        flash('Selected asset or quantity is invalid.', 'danger')
         return redirect(url_for('dashboard'))
 
     price = MARKET_CATALOG[symbol]['price']
@@ -305,7 +326,7 @@ def trade():
 
     if action == 'BUY':
         if user.balance_usd < total_cost:
-            flash('Insufficient USD funds for trade execution.')
+            flash('Insufficient USD funds for trade execution.', 'danger')
             return redirect(url_for('dashboard'))
         user.balance_usd -= total_cost
 
@@ -318,16 +339,23 @@ def trade():
             new_h = Portfolio(username=user.username, symbol=symbol, shares=shares, avg_price=price)
             db.session.add(new_h)
 
-        tx = TransactionLedger(username=user.username, tx_type='BUY', details=f'Bought {shares} units of {symbol}',
-                               amount=total_cost, status='SUCCESS', date=datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        tx = TransactionLedger(
+            tx_ref=generate_tx_ref(),
+            username=user.username,
+            tx_type='BUY',
+            details=f'Bought {shares} units of {symbol}',
+            amount=total_cost,
+            status='SUCCESS',
+            date=datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        )
         db.session.add(tx)
         db.session.commit()
-        flash(f'Successfully bought {shares} units of {symbol}!')
+        flash(f'Successfully bought {shares} units of {symbol}!', 'success')
 
     elif action == 'SELL':
         holding = Portfolio.query.filter_by(username=user.username, symbol=symbol).first()
         if not holding or holding.shares < shares:
-            flash('You do not own enough units to sell.')
+            flash('You do not own enough units to sell.', 'danger')
             return redirect(url_for('dashboard'))
 
         holding.shares -= shares
@@ -335,11 +363,18 @@ def trade():
             db.session.delete(holding)
         user.balance_usd += total_cost
 
-        tx = TransactionLedger(username=user.username, tx_type='SELL', details=f'Sold {shares} units of {symbol}',
-                               amount=total_cost, status='SUCCESS', date=datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        tx = TransactionLedger(
+            tx_ref=generate_tx_ref(),
+            username=user.username,
+            tx_type='SELL',
+            details=f'Sold {shares} units of {symbol}',
+            amount=total_cost,
+            status='SUCCESS',
+            date=datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        )
         db.session.add(tx)
         db.session.commit()
-        flash(f'Successfully sold {shares} units of {symbol}!')
+        flash(f'Successfully sold {shares} units of {symbol}!', 'success')
 
     return redirect(url_for('dashboard'))
 
@@ -347,6 +382,7 @@ def trade():
 @app.route('/logout')
 def logout():
     session.pop('username', None)
+    flash('You have been logged out securely.', 'info')
     return redirect(url_for('login'))
 
 
