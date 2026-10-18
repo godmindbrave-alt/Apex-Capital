@@ -2,19 +2,176 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Apex Capital - Register</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Apex Global Terminal - Register</title>
     <style>
-        body { font-family: Arial, sans-serif; background-color: #121212; color: white; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .card { background: #1e1e1e; padding: 30px; border-radius: 8px; width: 300px; text-align: center; }
-        input { width: 90%; padding: 10px; margin: 10px 0; border-radius: 4px; border: 1px solid #333; background: #2a2a2a; color: white; }
-        button { width: 100%; padding: 10px; background: #28a745; border: none; color: white; border-radius: 4px; cursor: pointer; }
-        a { color: #007bff; text-decoration: none; }
-        .flash { color: #ff6b6b; margin-bottom: 10px; }
+        :root {
+            --bg-base: #07090c;
+            --bg-panel: #12161c;
+            --border-line: #222831;
+            --text-color: #f1f3f5;
+            --text-muted: #8b949e;
+            --accent-gold: #f39c12;
+            --accent-green: #2ecc71;
+            --accent-blue: #3498db;
+            --accent-red: #e74c3c;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, sans-serif;
+            background-color: var(--bg-base);
+            color: var(--text-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .register-card {
+            background: var(--bg-panel);
+            padding: 35px 30px;
+            border-radius: 12px;
+            width: 100%;
+            max-width: 380px;
+            border: 1px solid var(--border-line);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+        }
+
+        .brand-header {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+
+        .brand-logo {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: var(--accent-gold);
+            letter-spacing: 1px;
+            margin-bottom: 5px;
+            display: block;
+        }
+
+        .brand-sub {
+            font-size: 0.75em;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .flash {
+            background: rgba(231, 76, 60, 0.15);
+            color: var(--accent-red);
+            padding: 10px 14px;
+            border-radius: 6px;
+            border-left: 4px solid var(--accent-red);
+            margin-bottom: 20px;
+            font-size: 0.85em;
+            text-align: left;
+        }
+
+        form {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            text-align: left;
+        }
+
+        label {
+            color: var(--text-muted);
+            font-size: 0.75em;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px 14px;
+            background: #1a202c;
+            border: 1px solid #2d3748;
+            color: white;
+            border-radius: 6px;
+            font-size: 0.9em;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--accent-green);
+            box-shadow: 0 0 0 3px rgba(46, 204, 113, 0.15);
+        }
+
+        .btn-submit {
+            width: 100%;
+            padding: 12px;
+            background: var(--accent-green);
+            color: #000;
+            font-size: 0.95em;
+            font-weight: bold;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-top: 5px;
+            transition: opacity 0.2s, transform 0.1s;
+        }
+
+        .btn-submit:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+
+        .btn-submit:active {
+            transform: translateY(0);
+        }
+
+        .card-footer {
+            margin-top: 25px;
+            text-align: center;
+            font-size: 0.85em;
+            color: var(--text-muted);
+        }
+
+        .card-footer a {
+            color: var(--accent-blue);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .card-footer a:hover {
+            text-decoration: underline;
+        }
+
+        .security-badge {
+            margin-top: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            font-size: 0.7em;
+            color: var(--accent-green);
+        }
     </style>
 </head>
 <body>
-    <div class="card">
-        <h2>Create Account</h2>
+    <div class="register-card">
+        <div class="brand-header">
+            <span class="brand-logo">⚡ APEX GLOBAL</span>
+            <span class="brand-sub">Create Trading Account</span>
+        </div>
+
         {% with messages = get_flashed_messages() %}
             {% if messages %}
                 {% for message in messages %}
@@ -22,12 +179,28 @@
                 {% endfor %}
             {% endif %}
         {% endwith %}
+
         <form method="POST" action="{{ url_for('register') }}">
-            <input type="text" name="username" placeholder="Username" required><br>
-            <input type="password" name="password" placeholder="Password" required><br>
-            <button type="submit">Register</button>
+            <div class="input-group">
+                <label>Choose Username</label>
+                <input type="text" name="username" placeholder="e.g. trader_pro" required autofocus>
+            </div>
+
+            <div class="input-group">
+                <label>Create Password</label>
+                <input type="password" name="password" placeholder="••••••••" required>
+            </div>
+
+            <button type="submit" class="btn-submit">Create Account & Open Terminal</button>
         </form>
-        <p>Already have an account? <a href="{{ url_for('login') }}">Login here</a></p>
+
+        <div class="card-footer">
+            <p>Already have an account? <a href="{{ url_for('login') }}">Sign In here</a></p>
+        </div>
+
+        <div class="security-badge">
+            <span>🛡️ Automated Multi-Currency Account Provisioning</span>
+        </div>
     </div>
 </body>
 </html>
